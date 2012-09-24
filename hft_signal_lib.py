@@ -102,7 +102,7 @@ def vwap_ema(data, decay):
     volume[np.where(volume <= 0.0)] = 1.0
     volume_price = data['volume'] * data['lastprice']
     volume_price_cumsum = np.cumsum(volume_price)
-    volume_cumsum = np.cumsum(volume_price)
+    volume_cumsum = np.cumsum(volume)
     volume_price_cumsum_ema = ema(volume_price_cumsum, decay)
     volume_cumsum_ema = ema(volume_cumsum, decay)
     return (volume_price_cumsum - volume_price_cumsum_ema) / (volume_cumsum - volume_cumsum_ema)
