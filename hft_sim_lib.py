@@ -2,17 +2,26 @@ from hft_signal_lib import *
 from hft_strat_lib import *
 
 def print_summary(pnl_array, name):
-    string = "\n"
-    string+= "pnl summary for %s\n"%name
-    string+= "Average Pnl  :   %.2f\n"%pnl_array['total_pnl'].mean()
-    string+= "Std Pnl      :   %.2f\n"%pnl_array['total_pnl'].std()
-    string+= "Daily Sharpe :   %.4f\n"%(pnl_array['total_pnl'].mean() / pnl_array['total_pnl'].std())
-    string+= "Min Daily Pnl:   %.2f\n"%pnl_array['total_pnl'].min()
-    string+= "Max Daily Pnl:   %.2f\n"%pnl_array['total_pnl'].max()
-    string+= "Daily Volume :   %.2f\n"%pnl_array['volume'].mean()
-    string+= "Prof per vol :   %.4f\n"%(pnl_array['total_pnl'].sum() / pnl_array['volume'].sum())
-    string+= "Max Position :   %.0f\n"%pnl_array['max_position'].max()
-    string+= "Min Position :   %.0f\n"%pnl_array['min_position'].min()
+    if len(pnl_array) > 1:
+        string = "\n"
+        string+= "pnl summary for %s\n"%name
+        string+= "Average Pnl  :   %.2f\n"%pnl_array['total_pnl'].mean()
+        string+= "Std Pnl      :   %.2f\n"%pnl_array['total_pnl'].std()
+        string+= "Daily Sharpe :   %.4f\n"%(pnl_array['total_pnl'].mean() / pnl_array['total_pnl'].std())
+        string+= "Min Daily Pnl:   %.2f\n"%pnl_array['total_pnl'].min()
+        string+= "Max Daily Pnl:   %.2f\n"%pnl_array['total_pnl'].max()
+        string+= "Daily Volume :   %.2f\n"%pnl_array['volume'].mean()
+        string+= "Prof per vol :   %.4f\n"%(pnl_array['total_pnl'].sum() / pnl_array['volume'].sum())
+        string+= "Max Position :   %.0f\n"%pnl_array['max_position'].max()
+        string+= "Min Position :   %.0f\n"%pnl_array['min_position'].min()
+    else :
+        string = "\n"
+        string+= "pnl summary for %s\n"%name
+        string+= "Average Pnl  :   %.2f\n"%pnl_array['total_pnl'].mean()
+        string+= "Daily Volume :   %.2f\n"%pnl_array['volume'].mean()
+        string+= "Prof per vol :   %.4f\n"%(pnl_array['total_pnl'].sum() / pnl_array['volume'].sum())
+        string+= "Max Position :   %.0f\n"%pnl_array['max_position'].max()
+        string+= "Min Position :   %.0f\n"%pnl_array['min_position'].min()
     print string
 
 
@@ -48,9 +57,9 @@ class RollSim(object):
         one_period = self.TrainDays + self.SimDays
         assert one_period <= len(self._dates)
         date_pairs = []
-        for ii in range(one_period-1, len(self._dates)):
+        for ii in range(one_period-1, len(self._dates), self.SimDays):
             train_dates = self._dates[(ii - one_period + 1): (ii - one_period + 1 + self.TrainDays)]
-            sim_dates = self._dates[(ii - one_period + 1 + self.TrainDays):ii]
+            sim_dates = self._dates[(ii - one_period + 1 + self.TrainDays):(ii+1)]
             date_pairs.append((train_dates, sim_dates))
         return date_pairs
 
