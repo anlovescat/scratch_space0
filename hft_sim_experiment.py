@@ -5,11 +5,11 @@ import numpy as np
 from scipy.optimize import nnls
 from collections import defaultdict
 
-cost = 0.15
+cost = 0.15 - 0.1 * 0.6
 drawdown = -10.0
 
 def get_signals(data):
-    decays = [0.01, 0.1, 0.5, 0.7, 0.8, 0.9]
+    decays = [0.5, 0.7, 0.8, 0.9]
     decay_names = [str(ff).replace('0.', '_') for ff in decays]
     mid = midpoint(data) 
     book = booksignal(data, 1, 0.9) - mid
@@ -67,7 +67,7 @@ def run_regression(result, dates):
 
 def optimize_thresh(result, dates, reg_param):
     names, beta, val_std = reg_param
-    thresh = np.arange(1.0, 4.0, 0.1) * val_std
+    thresh = np.arange(0.5, 3.5, 0.1) * val_std
     summary = [None] * len(thresh)
     for adate in dates:
         data = result[adate]
@@ -83,7 +83,7 @@ def optimize_thresh(result, dates, reg_param):
     sharpe  = [np.mean(item['total_pnl'] ) / np.std(item['total_pnl'] ) for item in summary]
     ppv     = [np.sum(item['total_pnl'] ) / np.sum(item['volume']) for item in summary]
     volume  = [np.mean(item['volume']) for item in summary]
-    sharpe_constrained = [sp if (vol > 450) and (vol < 2450) else -1e10 for (sp, vol) in zip(sharpe, volume)]
+    sharpe_constrained = [sp if (vol > 950) and (vol < 4450) else -1e10 for (sp, vol) in zip(sharpe, volume)]
     #print avg_pnl
     #print sharpe
     #print ppv
@@ -91,7 +91,10 @@ def optimize_thresh(result, dates, reg_param):
     print 'Optimization Dates  :  %s - %s'%(min(dates), max(dates))
     print 'Optimization Results:  idx = %d; thresh = %s'%(idx_max, str(thresh[idx_max]))
     print_summary(summary[idx_max], 'InSample Optimized')
-    return thresh[idx_max]
+    if sharpe[idx_max] < 0: ## negative stuff, no trading
+        return 1e10
+    else :
+        return thresh[idx_max]
 
 def optimize_in_sample(result, dates):
     reg_dates = dates#[:len(dates) / 2]
@@ -119,7 +122,7 @@ def sim_out_sample(result, dates, param):
     return pnl_array
 
 
-rsim = RollSim('trigger', 20, 5)
+rsim = RollSim('trigger', 10, 5)
 rsim.TrainFunc = optimize_in_sample
 rsim.SimFunc = sim_out_sample
 
