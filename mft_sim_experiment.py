@@ -13,7 +13,7 @@ FUTURE = 1
 
 TRAINED_MODEL = {}
 
-Trade_Thresh = 0.
+Trade_Thresh = 0.1
 Cost = 0.01
 
 Kernel = 'linear'
@@ -79,23 +79,29 @@ def get_signal(results, with_y=True, vol_normal=None, x_norm=None, normalize_y=F
             vol_mean = data['Volume'].mean()
             vol_normalization[ticker] = {'vol_mean': vol_mean, 'vol_std': vol_std}
         else :
+            if ticker not in vol_normalization.keys():
+                continue
             vol_std = vol_normalization[ticker]['vol_std']
             vol_mean = vol_normalization[ticker]['vol_mean']
+        if np.isnan(vol_std) or np.isnan(vol_mean):
+            continue
         for ii in range(HISTORY, len(data) - new_future, 1):
             #open_to_open = [(data['Open'][ii-jj] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
             open_to_close = [(data['Close'][ii-jj-1] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
-            #open_to_high =  [(data['High'][ii-jj-1] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
-            #open_to_low = [(data['Low'][ii-jj-1] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
+            open_to_high =  [(data['High'][ii-jj-1] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
+            open_to_low = [(data['Low'][ii-jj-1] - data['Open'][ii-jj-1])/data['Open'][ii-jj-1] for jj in range(HISTORY)]
             close_to_open = [(data['Open'][ii-jj] - data['Close'][ii-jj-1])/data['Close'][ii-jj-1] for jj in range(HISTORY)]
             std_volume = [(data['Volume'][ii-jj-1] - vol_mean) / vol_std for jj in range(HISTORY)]
             if with_y:
                 future_open_to_open = [(data['Open'][ii+jj] - data['Open'][ii]) / data['Open'][ii] for jj in [FUTURE]]
                 prepared_y += future_open_to_open
-            x_tmp = open_to_close + close_to_open + std_volume #open_to_open + open_to_close + open_to_high + open_to_low + close_to_open
+            x_tmp = open_to_close + open_to_high + open_to_low + close_to_open + std_volume #open_to_open + open_to_close + open_to_high + open_to_low + close_to_open
             prepared_x.append(x_tmp)
             tickers.append(ticker)
             dates.append(data['Date'][ii+FUTURE])
     names =  ['otc-' + str(jj) for jj in range(HISTORY)] + \
+        ['oth-' + str(jj) for jj in range(HISTORY)] + \
+        ['otl-' + str(jj) for jj in range(HISTORY)] + \
         ['cto-' + str(jj) for jj in range(HISTORY)] + \
         ['svol-' + str(jj) for jj in range(HISTORY)]
     prepared_x = np.array(prepared_x)
