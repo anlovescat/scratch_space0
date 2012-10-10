@@ -115,9 +115,9 @@ def generate_pnl(result, param, long_only=False):
         for ii in range(1, len(result)-1):
             row = result[ii].tolist()
             next_row = result[ii+1].tolist()
-            pos1 = (row[idx_min] - last_row[idx_max]) / last_row[idx_max] * (-1.0)
+            pos1 = (row[idx_min] - last_row[idx_max]) / last_row[idx_max]
             ret1 = (row[idx_max] - row[idx_min]) / row[idx_min]
-            pos2 = (row[idx_max] - row[idx_min]) / row[idx_min]
+            pos2 = (row[idx_max] - row[idx_min]) / row[idx_min] * (-1.0)
             ret2 = (next_row[idx_min] - row[idx_max]) / row[idx_max]
             if long_only:
                 pos1 = max(0.0, pos1)
@@ -132,9 +132,9 @@ def generate_pnl(result, param, long_only=False):
         for ii in range(1, len(result)-1):
             row = result[ii].tolist()
             next_row = result[ii+1].tolist()
-            pos1 = (row[idx_max] - last_row[idx_min]) / last_row[idx_min] 
+            pos1 = (row[idx_max] - last_row[idx_min]) / last_row[idx_min] * (-1.0)
             ret1 = (row[idx_min] - row[idx_max]) / row[idx_max]
-            pos2 = (row[idx_min] - row[idx_max]) / row[idx_max] * (-1.0)
+            pos2 = (row[idx_min] - row[idx_max]) / row[idx_max]
             ret2 = (next_row[idx_max] - row[idx_min]) / row[idx_min]
             if long_only:
                 pos1 = max(0.0, pos1)
@@ -171,21 +171,36 @@ def run_simulation_single(ticker):
     rsim.split_dates()
     rsim.run()
     rsim.print_pnl_summary()
-    avg_pnl = rsim.pnl_array['total_pnl'].sum() / rsim.pnl_array['volume'].sum()
-    sharpe = rsim.pnl_array['total_pnl'].mean() / rsim.pnl_array['total_pnl'].std() * np.sqrt(50)
+    exclude_top2trade = np.argsort(rsim.pnl_array['total_pnl'])[:-2]
+    idx = np.sort(exclude_top2trade)
+    total_pnl = rsim.pnl_array['total_pnl'][idx]
+    volume = rsim.pnl_array['volume'][idx]
+    avg_pnl = total_pnl.sum() / volume.sum()
+    sharpe = total_pnl.mean() / total_pnl.std() * np.sqrt(50)
     nweek = rsim.pnl_array.shape[0]
     return np.array([(ticker, sharpe, avg_pnl, nweek)], dtype = [('ticker', 'S9'), ('sharpe', float), ('avg_pnl', float), ('nweek', int)])
 
+def analyze_dzh_file(filename):
+    ticker, iso_week, data = load_file(filename)
+    result_all = estimate_var(data)
+    result_year = estimate_var(data, True)
+    print rec2txt(result_all)
+    print rec2txt(result_year)
+    
 
 if __name__ == '__main__': 
     rsim = WphRollSim('test_weekly_phase', 25, 25)
     rsim.TrainFunc = train_func
     rsim.SimFunc = sim_func
     
-    rsim.load_all_data('000006.SZ')
+    rsim.load_all_data('500018.SS')
     rsim.split_dates()
     rsim.run()
     rsim.print_pnl_summary()
+
+    import pylab as pl
+    pl.plot(np.cumsum(rsim.pnl_array['total_pnl']))
+    pl.show()
 
 
 
