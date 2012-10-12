@@ -271,6 +271,26 @@ def get_summary_simple_drawdown_limitorder_deprecated(target_position, data, dra
     return result
 
 
+def get_blotter_pnl_mm(add_filled_qty, add_filled_price, rem_filled_qty, rem_filled_price, data):
+    mid = midpoint(data)
+    cash = np.sum(add_filled_qty * add_filled_price) * (-1.0) + np.sum(rem_filled_qty * rem_filled_price) * (-1)
+    cum_position = np.cumsum(add_filled_qty + rem_filled_qty)
+    open_cash = cum_position[-1] * mid[-1]
+    pnl = cash + open_cash
+    pnl_t = np.cumsum(cum_position[:-1] * np.diff(mid))
+    spread = np.cumsum((mid - add_filled_price) * add_filled_qty) + np.cumsum((mid - rem_filled_price) * rem_filled_qty)
+    pnl_t = spread[1:] + pnl_t
+    assert abs(pnl - pnl_t[-1]) < 0.01
+    trade_volume = np.sum(np.abs(add_filled_qty) + np.abs(rem_filled_qty))
+
+    result = np.array([(pnl_t[-1], np.min(pnl_t), np.max(pnl_t),
+                        np.min(cum_position), np.max(cum_position), trade_volume)],
+                      dtype = [('total_pnl', 'f'), ('min_pnl', 'f'),
+                               ('max_pnl', 'f'), ('min_position', int),
+                               ('max_position', int), ('volume', int)])
+    return result
+        
+
 def get_blotter_pnl(order_qty, filled_qty, filled_price, cum_position, data, drawdown):
     #import pdb; pdb.set_trace()
     mid = midpoint(data)
@@ -305,7 +325,7 @@ def get_blotter_pnl(order_qty, filled_qty, filled_price, cum_position, data, dra
                                ('max_position', int), ('volume', int),
                                ('order_volume', int), ('fill_ratio', float)])
     return result
-        
+
 
 
 def is_filled_simple(bid_limit, ask_limit, trade_price):
@@ -316,41 +336,76 @@ def is_filled_simple(bid_limit, ask_limit, trade_price):
     else :
         return 0
 
-def sim_market_making_simple(data, valuation, edge, edge_buffer, latency, ticksize):
+def is_removed_simple(bid_market, ask_market, bid, ask):
+    if bid_market >= ask :
+        return 1
+    elif ask_market <= bid:
+        return -1
+    else :
+        return 0
+
+def sim_market_making_simple(data, valuation, edge, edge_buffer, rem_edge, latency, ticksize):
     mid = midpoint(data)
     bid_limitprice, ask_limitprice = get_limit_price(valuation, edge, ticksize)
-    back_off_factor = 100
+    bid_marketprice, ask_marketprice = get_limit_price(valuation, rem_edge, ticksize)
+    back_off_factor = 0
+    pos_max_factor = 100
     beg_idx = np.min(np.where(~np.isnan(valuation)))
     bid_quote = bid_limitprice[beg_idx]
     ask_quote = ask_limitprice[beg_idx]
+    bid_rem = bid_marketprice[beg_idx]
+    ask_rem = ask_marketprice[beg_idx]
     filled_qty = np.zeros(len(mid))
     filled_price = np.zeros(len(mid))
+    rem_filled_qty = np.zeros(len(mid))
+    rem_filled_price = np.zeros(len(mid))
     bid_edge_adjust = 0.0
     ask_edge_adjust = 0.0
+    cur_position = 0.0
     #import pdb;pdb.set_trace()
     for ii in range(beg_idx+1, len(mid)):
         filled = is_filled_simple(bid_quote, ask_quote, data['lastprice'][ii])
+        bid_edge_adjust = 0.0
+        ask_edge_adjust = 0.0
         if filled > 0:
             filled_qty[ii] = filled
             filled_price[ii] = bid_quote
             bid_edge_adjust = ticksize * back_off_factor
             ask_edge_adjust = 0.0
+            cur_position += filled
         elif filled < 0:
             filled_qty[ii] = filled
             filled_price[ii] = ask_quote
             ask_edge_adjust = ticksize * back_off_factor
             bid_edge_adjust = 0.0
-        if valuation[ii] - bid_quote <= edge - edge_buffer:
+            cur_position += filled
+        if cur_position > 0:
+            bid_edge_adjust += ticksize * pos_max_factor
+        elif cur_position < 0:
+            ask_edge_adjust += ticksize * pos_max_factor
+            
+        if valuation[ii] - bid_quote <= edge - edge_buffer or valuation[ii] - bid_quote > edge:
             bid_quote = bid_limitprice[ii]
-        if ask_quote - valuation[ii] <= edge - edge_buffer:
+        if ask_quote - valuation[ii] <= edge - edge_buffer or ask_quote - valuation[ii] > edge:
             ask_quote = ask_limitprice[ii]
         bid_quote -= bid_edge_adjust
         ask_quote += ask_edge_adjust
         
-    order_qty = filled_qty.copy()
-    cum_position = np.cumsum(filled_qty)
-    result = get_blotter_pnl(order_qty, filled_qty, filled_price, cum_position, data, drawdown=-100000.0)
-    import pdb;pdb.set_trace()
+        bid_rem = bid_marketprice[ii] - bid_edge_adjust
+        ask_rem = ask_marketprice[ii] + ask_edge_adjust
+        rem_filled = is_removed_simple(bid_rem, ask_rem, data['bid1'][ii], data['ask1'][ii])
+        if rem_filled > 0:
+            rem_filled_qty[ii] = rem_filled
+            rem_filled_price[ii] = data['bid1'][ii]
+            cur_position += rem_filled
+        elif rem_filled < 0:
+            rem_filled_qty[ii] = rem_filled
+            rem_filled_price[ii] = data['ask1'][ii]
+            cur_position += rem_filled
+
+    result = get_blotter_pnl_mm(filled_qty, filled_price, rem_filled_qty, rem_filled_price, data)
+    
+    #import pdb;pdb.set_trace()
     return result
 
 

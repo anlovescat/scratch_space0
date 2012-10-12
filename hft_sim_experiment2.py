@@ -5,14 +5,14 @@ import numpy as np
 from scipy.optimize import nnls
 from collections import defaultdict
 
-cost = 0.0#0.15 - 0.1 * 0.6
+cost = 0.15 #- 0.1 * 0.6
 drawdown = -1000.0
 
 ticksize = 0.25
-#edge = 0.5
+edge = 0.9
 edge_buffer_frac = 0.5
+edge_rem_frac = 0.1
 latency = 0
-#time_in_force = 600
 
 def get_signals(data):
     decays = [0.5, 0.7, 0.8, 0.9]
@@ -73,17 +73,17 @@ def run_regression(result, dates):
 
 def optimize_thresh(result, dates, reg_param):
     names, beta, val_std = reg_param
-    thresh = np.arange(0.5, 3.5, 0.1) * val_std
+    thresh = edge + np.arange(-0.1, 0.12, 0.02) #np.arange(0.5, 3.5, 0.1) * val_std
     summary = [None] * len(thresh)
     for adate in dates:
         data = result[adate]
         valuation = construct_valuation(data, beta)
         for ii, th in enumerate(thresh):
             if summary[ii] is None:
-                summary[ii] = sim_market_making_simple(data, valuation, th, th * edge_buffer_frac,
+                summary[ii] = sim_market_making_simple(data, valuation, th, th * edge_buffer_frac, th * edge_rem_frac,
                                                        latency, ticksize)
             else :
-                summary[ii] = np.append(summary[ii], sim_market_making_simple(data, valuation, th, th * edge_buffer_frac,
+                summary[ii] = np.append(summary[ii], sim_market_making_simple(data, valuation, th, th * edge_buffer_frac, th * edge_rem_frac,
                                                                               latency, ticksize))
     for ii in range(len(summary)):
         summary[ii]['total_pnl'] -= (summary[ii]['volume'] * cost)
@@ -91,7 +91,7 @@ def optimize_thresh(result, dates, reg_param):
     sharpe  = [np.mean(item['total_pnl'] ) / np.std(item['total_pnl'] ) for item in summary]
     ppv     = [np.sum(item['total_pnl'] ) / np.sum(item['volume']) for item in summary]
     volume  = [np.mean(item['volume']) for item in summary]
-    sharpe_constrained = [sp if (vol > 950) and (vol < 4450) else -1e10 for (sp, vol) in zip(sharpe, volume)]
+    sharpe_constrained = [sp if (vol > 200) and (vol < 2050) else -1e10 for (sp, vol) in zip(sharpe, volume)]
     #print avg_pnl
     #print sharpe
     #print ppv
@@ -121,10 +121,10 @@ def sim_out_sample(result, dates, param):
         data = result[adate]
         valuation = construct_valuation(data, beta)
         if pnl_array is None:
-            pnl_array = sim_market_making_simple(data, valuation, thresh, thresh * edge_buffer_frac,
+            pnl_array = sim_market_making_simple(data, valuation, thresh, thresh * edge_buffer_frac, thresh * edge_rem_frac,
                                                  latency, ticksize)
         else :
-            pnl_array = np.append(pnl_array, sim_market_making_simple(data, valuation, thresh, thresh * edge_buffer_frac,
+            pnl_array = np.append(pnl_array, sim_market_making_simple(data, valuation, thresh, thresh * edge_buffer_frac, thresh * edge_rem_frac,
                                                                       latency, ticksize))
     pnl_array['total_pnl'] -= (pnl_array['volume'] * cost)
     print 'OutSample Dates : %s - %s'%(min(dates), max(dates))
@@ -136,7 +136,7 @@ rsim = RollSim('trigger', 10, 5)
 rsim.TrainFunc = optimize_in_sample
 rsim.SimFunc = sim_out_sample
 
-rsim.YearMonthList = ['201101']
+#rsim.YearMonthList = ['201101']
 
 rsim.load_all_data()
 rsim.split_dates()
