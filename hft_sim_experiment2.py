@@ -8,7 +8,7 @@ from collections import defaultdict
 cost = 0.15 #- 0.1 * 0.6
 drawdown = -1000.0
 
-ticksize = 0.25
+ticksize = 0.2
 edge = 0.9
 edge_buffer_frac = 0.5
 edge_rem_frac = 0.1
